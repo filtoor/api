@@ -68,7 +68,7 @@ def get_proof_length(treeId):
 
 def get_image_words(imageUrl):
   start = time.time()
-  print(time.time() - start, "fetching image")
+  print(0, "fetching image")
   response = requests.get(imageUrl)
 
   print(time.time() - start, "converting image")
