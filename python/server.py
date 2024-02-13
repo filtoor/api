@@ -6,6 +6,12 @@ import base64
 import math
 import os
 from dotenv import load_dotenv
+from PIL import Image
+import easyocr
+import io
+import time
+
+reader = easyocr.Reader(['en'])
 
 load_dotenv()
 
@@ -24,11 +30,6 @@ header_schema = CStruct(
   "sequenceNumber" / U64,
   "activeIndex" / U64,
   "bufferSize" / U64,
-)
-
-account_schema = CStruct(
-    "accountType" / String,
-    "header" / header_schema
 )
 
 # gets the proof length from a given treeId
@@ -63,7 +64,22 @@ def get_proof_length(treeId):
   canopyHeight = int(math.log2(canopySize / 32 + 2) - 1)
   proofLength = maxDepth - canopyHeight
 
-  return proofLength 
+  return proofLength
+
+def get_image_words(imageUrl):
+  print(time.time(), "starting ocr")
+  response = requests.get(imageUrl)
+
+  img = Image.open(io.BytesIO(response.content))
+  img = img.convert("RGB")
+  img = img.resize((1000, 1000))
+  imgByteArr = io.BytesIO()
+  img.save(imgByteArr, format='JPEG')
+
+  result = reader.readtext(imgByteArr.getvalue(), detail=0)
+  print(time.time(), "finished ocr")
+
+  return result
 
 def classify_one(id):
   # TODO: check against the database
@@ -88,7 +104,6 @@ def classify_one(id):
   )
   rpcResponse = response.json()
 
-
   if "error" in rpcResponse:
     return "error"
 
@@ -97,9 +112,17 @@ def classify_one(id):
   # if found, return the result
   treeId = compressionData["tree"]
   proofLength = get_proof_length(treeId)
-  print(proofLength)
 
-  return rpcResponse
+  # prefer cdn when available
+  imageUrl = ""
+  if "cdn_uri" in rpcResponse["result"]["content"]["files"][0]:
+    imageUrl = rpcResponse["result"]["content"]["files"][0]["cdn_uri"]
+  else:
+    imageUrl =rpcResponse["result"]["content"]["links"]["image"]
+
+  imageWords = get_image_words(imageUrl)
+  
+  return {"imageWords": imageWords, "proofLength": proofLength}
 
 @app.route("/classify", methods=["POST"])
 def classify():
@@ -110,8 +133,8 @@ def classify():
       "error": "No ids provided"
     }), 400
 
-  result = 0
+  result = []
   for id in data["ids"]:
-    classify_one(id)
+    result.append(classify_one(id))
 
   return jsonify(result)
