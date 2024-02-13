@@ -67,17 +67,20 @@ def get_proof_length(treeId):
   return proofLength
 
 def get_image_words(imageUrl):
-  print(time.time(), "starting ocr")
+  start = time.time()
+  print(time.time() - start, "fetching image")
   response = requests.get(imageUrl)
 
+  print(time.time() - start, "converting image")
   img = Image.open(io.BytesIO(response.content))
   img = img.convert("RGB")
   img = img.resize((1000, 1000))
   imgByteArr = io.BytesIO()
   img.save(imgByteArr, format='JPEG')
 
+  print(time.time() - start, "starting ocr")
   result = reader.readtext(imgByteArr.getvalue(), detail=0)
-  print(time.time(), "finished ocr")
+  print(time.time() - start, "finished ocr")
 
   return result
 
