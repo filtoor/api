@@ -279,7 +279,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/classify-serverless/dev/1707890468533-2024-02-14T06:01:08.533Z/classify-serverless.zip"
+                "S3Key": "serverless/classify-serverless/dev/1707901344374-2024-02-14T09:02:24.374Z/classify-serverless.zip"
               },
               "Handler": "s_classify.handler",
               "Runtime": "nodejs18.x",
@@ -304,7 +304,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/classify-serverless/dev/1707890468533-2024-02-14T06:01:08.533Z/classify-serverless.zip"
+                "S3Key": "serverless/classify-serverless/dev/1707901344374-2024-02-14T09:02:24.374Z/classify-serverless.zip"
               },
               "Handler": "s_tesseract_ocr.handler",
               "Runtime": "python3.8",
@@ -327,24 +327,24 @@
               "TesseractDashocrLogGroup"
             ]
           },
-          "ClassifyLambdaVersion8WFebEsPiLrhfbbmQGeXBaJF8bRaedvFFMRVNZPiQU": {
+          "ClassifyLambdaVersionhCT84alOaXo8Uv85MOU4u5yiLv65oHnADYkBzy6Xw": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "ClassifyLambdaFunction"
               },
-              "CodeSha256": "1Cg7mSSwM6J4B3bLKY6410NPzTX7OISVJSywFTemUX8="
+              "CodeSha256": "eu9QTfIP+T7l0so8ZE8WzZbVjjt+A/+QZ/kquKcXrXg="
             }
           },
-          "TesseractDashocrLambdaVersion88KAQIHIYQeHzxQMuqSjJ2LC4fKFyFCTDtJaaIPA": {
+          "TesseractDashocrLambdaVersionx5ZBkGgMVWDrkZRsROkaX8OibX2uCNvgkLJ6KRnSQ": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "TesseractDashocrLambdaFunction"
               },
-              "CodeSha256": "1Cg7mSSwM6J4B3bLKY6410NPzTX7OISVJSywFTemUX8="
+              "CodeSha256": "eu9QTfIP+T7l0so8ZE8WzZbVjjt+A/+QZ/kquKcXrXg="
             }
           },
           "HttpApi": {
@@ -514,6 +514,26 @@
               ],
               "BillingMode": "PAY_PER_REQUEST"
             }
+          },
+          "uriTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "DeletionPolicy": "Retain",
+            "Properties": {
+              "TableName": "uriTable",
+              "AttributeDefinitions": [
+                {
+                  "AttributeName": "uri",
+                  "AttributeType": "S"
+                }
+              ],
+              "KeySchema": [
+                {
+                  "AttributeName": "uri",
+                  "KeyType": "HASH"
+                }
+              ],
+              "BillingMode": "PAY_PER_REQUEST"
+            }
           }
         },
         "Outputs": {
@@ -562,7 +582,7 @@
           "ClassifyLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "ClassifyLambdaVersion8WFebEsPiLrhfbbmQGeXBaJF8bRaedvFFMRVNZPiQU"
+              "Ref": "ClassifyLambdaVersionhCT84alOaXo8Uv85MOU4u5yiLv65oHnADYkBzy6Xw"
             },
             "Export": {
               "Name": "sls-classify-serverless-dev-ClassifyLambdaFunctionQualifiedArn"
@@ -571,7 +591,7 @@
           "TesseractDashocrLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "TesseractDashocrLambdaVersion88KAQIHIYQeHzxQMuqSjJ2LC4fKFyFCTDtJaaIPA"
+              "Ref": "TesseractDashocrLambdaVersionx5ZBkGgMVWDrkZRsROkaX8OibX2uCNvgkLJ6KRnSQ"
             },
             "Export": {
               "Name": "sls-classify-serverless-dev-TesseractDashocrLambdaFunctionQualifiedArn"
@@ -750,7 +770,7 @@
         "memory": 1024,
         "runtime": "nodejs18.x",
         "vpc": {},
-        "versionLogicalId": "ClassifyLambdaVersion8WFebEsPiLrhfbbmQGeXBaJF8bRaedvFFMRVNZPiQU"
+        "versionLogicalId": "ClassifyLambdaVersionhCT84alOaXo8Uv85MOU4u5yiLv65oHnADYkBzy6Xw"
       },
       "tesseract-ocr": {
         "handler": "s_tesseract_ocr.handler",
@@ -764,7 +784,7 @@
         "memory": 1024,
         "timeout": 6,
         "vpc": {},
-        "versionLogicalId": "TesseractDashocrLambdaVersion88KAQIHIYQeHzxQMuqSjJ2LC4fKFyFCTDtJaaIPA"
+        "versionLogicalId": "TesseractDashocrLambdaVersionx5ZBkGgMVWDrkZRsROkaX8OibX2uCNvgkLJ6KRnSQ"
       }
     },
     "resources": {
@@ -828,6 +848,26 @@
             ],
             "BillingMode": "PAY_PER_REQUEST"
           }
+        },
+        "uriTable": {
+          "Type": "AWS::DynamoDB::Table",
+          "DeletionPolicy": "Retain",
+          "Properties": {
+            "TableName": "uriTable",
+            "AttributeDefinitions": [
+              {
+                "AttributeName": "uri",
+                "AttributeType": "S"
+              }
+            ],
+            "KeySchema": [
+              {
+                "AttributeName": "uri",
+                "KeyType": "HASH"
+              }
+            ],
+            "BillingMode": "PAY_PER_REQUEST"
+          }
         }
       },
       "Outputs": {}
@@ -879,7 +919,7 @@
     "artifact": "/home/solarnius/filtoor/api/serverless/.serverless/classify-serverless.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/classify-serverless/dev/1707890468533-2024-02-14T06:01:08.533Z",
+    "artifactDirectoryName": "serverless/classify-serverless/dev/1707901344374-2024-02-14T09:02:24.374Z",
     "artifact": "classify-serverless.zip"
   }
 }

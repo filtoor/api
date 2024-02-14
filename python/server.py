@@ -207,11 +207,13 @@ def classify_one(id, uri=None):
   proofLength = get_proof_length(treeId)
 
   # prefer cdn when available
-  imageUrl = ""
-  if "cdn_uri" in rpcResponse["result"]["content"]["files"][0]:
-    imageUrl = rpcResponse["result"]["content"]["files"][0]["cdn_uri"]
-  else:
-    imageUrl = rpcResponse["result"]["content"]["links"]["image"]
+  # imageUrl = ""
+  # if "cdn_uri" in rpcResponse["result"]["content"]["files"][0]:
+  #   imageUrl = rpcResponse["result"]["content"]["files"][0]["cdn_uri"]
+  # else:
+  #   imageUrl = rpcResponse["result"]["content"]["links"]["image"]
+
+  imageUrl = rpcResponse["result"]["content"]["links"]["image"]
 
   print(time.time() - startTime, "ocr call")
   imageWords = get_image_words(imageUrl)
@@ -317,8 +319,13 @@ def ingestRoute():
   data = request.json
   events = data[0]["events"]["compressed"]
 
+  results = []
   for event in events:
-    classify_one(event["id"], event["uri"])
+    print(event)
+    result = classify_one(event["assetId"], event["metadata"]["uri"])
+    results.append(result)
+  
+  return "ok" 
 
 if __name__ == "__main__":
   app.run(host='0.0.0.0', port=8888)
