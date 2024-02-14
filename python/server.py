@@ -10,6 +10,7 @@ from PIL import Image
 import easyocr
 import io
 import time
+from multiprocessing import Pool
 
 reader = easyocr.Reader(['en'])
 
@@ -137,7 +138,7 @@ def classify():
     }), 400
 
   result = []
-  for id in data["ids"]:
-    result.append(classify_one(id))
+  with Pool(len(data["ids"])) as p:
+    result = p.map(classify_one, data["ids"])
 
   return jsonify(result)
