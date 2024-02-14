@@ -120,7 +120,6 @@ def classify_one(id):
   imageUrl = ""
   if "cdn_uri" in rpcResponse["result"]["content"]["files"][0]:
     imageUrl = rpcResponse["result"]["content"]["files"][0]["cdn_uri"]
-    imageUrl =rpcResponse["result"]["content"]["links"]["image"]
   else:
     imageUrl =rpcResponse["result"]["content"]["links"]["image"]
 
