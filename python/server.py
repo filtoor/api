@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import requests
 from borsh_construct import CStruct, U8, U32, U64, HashMap, String, Bytes, Vec
-from solders.account_decoder import ParsedAccount
 import base64
 import math
 import os
@@ -11,12 +10,19 @@ import easyocr
 import io
 import time
 from joblib import Parallel, delayed
+import boto3
+import json
+import re
 
 load_dotenv()
-
 app = Flask(__name__)
-
 rpcUrl=os.getenv("RPC_URL")
+dynamodb = boto3.resource('dynamodb')
+cnftTable = dynamodb.Table('cnftTable')
+treeTable = dynamodb.Table('treeTable')
+
+model_file = open('model.json')
+model = json.load(model_file)
 
 header_schema = CStruct(
   "versionedHeader" / U8,
@@ -35,6 +41,14 @@ header_schema = CStruct(
 # very useful for determining if tree is spam or not
 # lots of crazy byte counting here
 def get_proof_length(treeId):
+  response = treeTable.get_item(
+    Key={
+        'address': treeId,
+    }
+  )
+  if ("Item" in response):
+    return response["Item"]["proofLength"]
+
   response = requests.post(rpcUrl, headers={
       "Content-Type": "application/json",
     },
@@ -63,6 +77,13 @@ def get_proof_length(treeId):
   canopyHeight = int(math.log2(canopySize / 32 + 2) - 1)
   proofLength = maxDepth - canopyHeight
 
+  treeTable.put_item(
+    Item={
+      'address': treeId,
+      'proofLength': proofLength,
+    }
+  )
+
   return proofLength
 
 def get_image_words(imageUrl, reader):
@@ -73,7 +94,7 @@ def get_image_words(imageUrl, reader):
   print(time.time() - start, "converting image")
   img = Image.open(io.BytesIO(response.content))
   img = img.convert("RGB")
-  img = img.resize((1000, 1000))
+  img = img.resize((500, 500))
   imgByteArr = io.BytesIO()
   img.save(imgByteArr, format='JPEG')
 
@@ -83,11 +104,42 @@ def get_image_words(imageUrl, reader):
 
   return result
 
+def classify(tokens):
+  spamLikelihood = model["spam"]["size"] / (model["spam"]["size"] + model["ham"]["size"])
+  hamLikelihood = 1 - spamLikelihood
+
+  uniqueTokens = set(tokens)
+
+  for token in uniqueTokens:
+    spamNumerator = 1
+    if (token in model["spam"]["tokens"]):
+      spamNumerator = model["spam"]["tokens"][token] + 1
+    hamNumerator = 1
+    if (token in model["ham"]["tokens"]):
+      hamNumerator = model["ham"]["tokens"][token] + 1
+    spamTokenLikelihood = spamNumerator / (model["spam"]["size"] + 2)
+    hamTokenLikelihood = hamNumerator / (model["ham"]["size"] + 2)
+
+    spamLikelihood *= spamTokenLikelihood
+    hamLikelihood *= hamTokenLikelihood
+
+  if (spamLikelihood > hamLikelihood):
+    return "spam"
+  else:
+    return "ham"
+  
 def classify_one(id, reader):
+  response = cnftTable.get_item(
+    Key={
+        'address': id,
+    }
+  )
+  if ("Item" in response):
+    return response["Item"]["classification"]
+
   startTime = time.time()
   print(0, "rpc call 1")
-  # TODO: check against the database
-  # if found, return the result
+  
   response = requests.post(rpcUrl, headers={
       "Content-Type": "application/json",
     },
@@ -123,15 +175,83 @@ def classify_one(id, reader):
   if "cdn_uri" in rpcResponse["result"]["content"]["files"][0]:
     imageUrl = rpcResponse["result"]["content"]["files"][0]["cdn_uri"]
   else:
-    imageUrl =rpcResponse["result"]["content"]["links"]["image"]
+    imageUrl = rpcResponse["result"]["content"]["links"]["image"]
 
   print(time.time() - startTime, "ocr call")
   imageWords = get_image_words(imageUrl, reader)
+  attributeWords = []
+  attributes = rpcResponse["result"]["content"]["metadata"]["attributes"]
+  for attribute in attributes:
+    attributeWords += attribute["value"].split()
+    attributeWords += attribute["trait_type"].split()
 
-  return {"imageWords": imageWords, "proofLength": proofLength}
+  tokens = imageWords + attributeWords
+
+  keywords = [
+    "containsEmoji",
+    "proofLengthImpossible",
+    "imageContainsUrl",
+    "not_containsEmoji",
+    "not_proofLengthImpossible",
+    "not_imageContainsUrl",
+  ]
+
+  tokens = list(filter(lambda token: len(token) > 2 and token not in keywords, tokens))
+
+  EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    "\U0001F600-\U0001F64F"  # emoticons
+    "\U0001F680-\U0001F6FF"  # transport & map symbols
+    "\U0001F700-\U0001F77F"  # alchemical symbols
+    "\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
+    "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
+    "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+    "\U0001FA00-\U0001FA6F"  # Chess Symbols
+    "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+    "\U00002702-\U000027B0"  # Dingbats
+    "\U000024C2-\U0001F251" 
+    "]+",
+  flags = re.UNICODE) 
+
+  containsUrl = False
+  containsEmoji = False
+
+  for token in tokens:
+    if (re.search(r'^[\S]+[.][\S]', token)):
+      containsUrl = True
+    if (re.search(EMOJI_PATTERN, token)):
+      containsEmoji = True
+
+  if (proofLength > 23):
+    tokens.append("proofLengthImpossible")
+  else:
+    tokens.append("not_proofLengthImpossible")
+
+  if (containsUrl):
+    tokens.append("imageContainsUrl")
+  else:
+    tokens.append("not_imageContainsUrl")
+  
+  if (containsEmoji):
+    tokens.append("containsEmoji")
+  else:
+    tokens.append("not_containsEmoji")
+
+  classification = classify(tokens)
+  
+  cnftTable.put_item(
+    Item={
+      'address': id,
+      'classification': classification,
+    }
+  )
+
+  return classification
 
 @app.route("/classify", methods=["POST"])
-def classify():
+def classifyRoute():
   data = request.json
 
   if ("ids" not in data):
