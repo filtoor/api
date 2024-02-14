@@ -18,6 +18,7 @@ load_dotenv()
 app = Flask(__name__)
 rpcUrl=os.getenv("RPC_URL")
 dynamodb = boto3.resource('dynamodb')
+
 cnftTable = dynamodb.Table('cnftTable')
 treeTable = dynamodb.Table('treeTable')
 imageTable = dynamodb.Table('imageTable')
@@ -282,6 +283,12 @@ def classifyRoute():
   print("returning after", time.time() - startTime)
 
   return jsonify(result)
+
+@app.route("/ingest", methods=["POST"])
+def ingestRoute():
+  data = request.json
+
+  print(data)
 
 if __name__ == "__main__":
   reader = easyocr.Reader(['en'])
