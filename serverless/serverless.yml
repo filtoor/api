@@ -85,4 +85,16 @@ resources:
           - AttributeName: address
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+    imageTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: imageTable
+        AttributeDefinitions:
+          - AttributeName: url
+            AttributeType: S
+        KeySchema:
+          - AttributeName: url
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
     

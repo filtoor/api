@@ -20,6 +20,8 @@ rpcUrl=os.getenv("RPC_URL")
 dynamodb = boto3.resource('dynamodb')
 cnftTable = dynamodb.Table('cnftTable')
 treeTable = dynamodb.Table('treeTable')
+imageTable = dynamodb.Table('imageTable')
+
 
 model_file = open('model.json')
 model = json.load(model_file)
@@ -87,6 +89,14 @@ def get_proof_length(treeId):
   return proofLength
 
 def get_image_words(imageUrl, reader):
+  response = imageTable.get_item(
+    Key={
+        'url': imageUrl,
+    }
+  )
+  if ("Item" in response):
+    return response["Item"]["words"]
+
   start = time.time()
   print(0, "fetching image")
   response = requests.get(imageUrl)
@@ -101,6 +111,13 @@ def get_image_words(imageUrl, reader):
   print(time.time() - start, "starting ocr")
   result = reader.readtext(imgByteArr.getvalue(), detail=0, batch_size=16)
   print(time.time() - start, "finished ocr")
+
+  imageTable.put_item(
+    Item={
+      'url': imageUrl,
+      'words': result,
+    }
+  )
 
   return result
 
@@ -164,8 +181,6 @@ def classify_one(id, reader):
     return "error"
 
   compressionData = rpcResponse["result"]["compression"]
-  # TODO: check the data_hash against database
-  # if found, return the result
   treeId = compressionData["tree"]
   print(time.time() - startTime, "rpc call 2")
   proofLength = get_proof_length(treeId)
@@ -180,10 +195,12 @@ def classify_one(id, reader):
   print(time.time() - startTime, "ocr call")
   imageWords = get_image_words(imageUrl, reader)
   attributeWords = []
-  attributes = rpcResponse["result"]["content"]["metadata"]["attributes"]
-  for attribute in attributes:
-    attributeWords += attribute["value"].split()
-    attributeWords += attribute["trait_type"].split()
+
+  if ("attributes" in rpcResponse["result"]["content"]["metadata"]):
+    attributes = rpcResponse["result"]["content"]["metadata"]["attributes"]
+    for attribute in attributes:
+      attributeWords += attribute["value"].split()
+      attributeWords += attribute["trait_type"].split()
 
   tokens = imageWords + attributeWords
 
@@ -240,7 +257,7 @@ def classify_one(id, reader):
     tokens.append("not_containsEmoji")
 
   classification = classify(tokens)
-  
+
   cnftTable.put_item(
     Item={
       'address': id,
