@@ -12,9 +12,6 @@ import io
 import time
 import multiprocessing as mp
 
-
-reader = easyocr.Reader(['en'])
-
 load_dotenv()
 
 app = Flask(__name__)
@@ -55,7 +52,7 @@ def get_proof_length(treeId):
   byte_data = base64.b64decode(data.encode())
   parsed_bytes = header_schema.parse(byte_data)
 
-  fixedHeaderSize = 80 
+  fixedHeaderSize = 80
   maxDepth = parsed_bytes["maxDepth"]
   bufferSize = parsed_bytes["maxBufferSize"]
 
@@ -68,7 +65,7 @@ def get_proof_length(treeId):
 
   return proofLength
 
-def get_image_words(imageUrl):
+def get_image_words(imageUrl, reader):
   start = time.time()
   print(0, "fetching image")
   response = requests.get(imageUrl)
@@ -81,12 +78,14 @@ def get_image_words(imageUrl):
   img.save(imgByteArr, format='JPEG')
 
   print(time.time() - start, "starting ocr")
-  result = reader.readtext(imgByteArr.getvalue(), detail=0)
+  result = reader.readtext(imgByteArr.getvalue(), detail=0, batch_size=16)
   print(time.time() - start, "finished ocr")
 
   return result
 
-def classify_one(id):
+def classify_one(id, reader):
+  startTime = time.time()
+  print(0, "rpc call 1")
   # TODO: check against the database
   # if found, return the result
   response = requests.post(rpcUrl, headers={
@@ -116,6 +115,7 @@ def classify_one(id):
   # TODO: check the data_hash against database
   # if found, return the result
   treeId = compressionData["tree"]
+  print(time.time() - startTime, "rpc call 2")
   proofLength = get_proof_length(treeId)
 
   # prefer cdn when available
@@ -125,8 +125,9 @@ def classify_one(id):
   else:
     imageUrl =rpcResponse["result"]["content"]["links"]["image"]
 
-  imageWords = get_image_words(imageUrl)
-  
+  print(time.time() - startTime, "ocr call")
+  imageWords = get_image_words(imageUrl, reader)
+
   return {"imageWords": imageWords, "proofLength": proofLength}
 
 @app.route("/classify", methods=["POST"])
@@ -139,10 +140,15 @@ def classify():
     }), 400
 
   result = []
+  startTime = time.time()
   with mp.Pool(len(data["ids"])) as p:
-    result = p.map(classify_one, data["ids"])
+    result = p.starmap(classify_one, [(id, reader) for id in data["ids"]])
+
+  print("returning after", time.time() - startTime)
 
   return jsonify(result)
 
 if __name__ == "__main__":
+  reader = easyocr.Reader(['en'])
   mp.set_start_method('spawn')
+  app.run()
