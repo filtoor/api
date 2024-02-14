@@ -22,10 +22,12 @@ dynamodb = boto3.resource('dynamodb')
 cnftTable = dynamodb.Table('cnftTable')
 treeTable = dynamodb.Table('treeTable')
 imageTable = dynamodb.Table('imageTable')
-
+uriTable = dynamodb.Table('uriTable')
 
 model_file = open('model.json')
 model = json.load(model_file)
+
+reader = easyocr.Reader(['en'])
 
 header_schema = CStruct(
   "versionedHeader" / U8,
@@ -89,7 +91,7 @@ def get_proof_length(treeId):
 
   return proofLength
 
-def get_image_words(imageUrl, reader):
+def get_image_words(imageUrl):
   response = imageTable.get_item(
     Key={
         'url': imageUrl,
@@ -146,7 +148,7 @@ def classify(tokens):
   else:
     return "ham"
   
-def classify_one(id, reader):
+def classify_one(id, uri=None):
   response = cnftTable.get_item(
     Key={
         'address': id,
@@ -154,6 +156,24 @@ def classify_one(id, reader):
   )
   if ("Item" in response):
     return response["Item"]["classification"]
+
+  if (uri):
+    # cache based on uri of metadata
+    # good for ingesting
+    response = uriTable.get_item(
+      Key={
+          'uri': uri,
+      }
+    )
+    if ("Item" in response):
+      classification = response["Item"]["classification"]
+      cnftTable.put_item(
+        Item={
+          'address': id,
+          'classification': classification,
+        }
+      ) 
+      return classification
 
   startTime = time.time()
   print(0, "rpc call 1")
@@ -194,7 +214,7 @@ def classify_one(id, reader):
     imageUrl = rpcResponse["result"]["content"]["links"]["image"]
 
   print(time.time() - startTime, "ocr call")
-  imageWords = get_image_words(imageUrl, reader)
+  imageWords = get_image_words(imageUrl)
   attributeWords = []
 
   if ("attributes" in rpcResponse["result"]["content"]["metadata"]):
@@ -266,6 +286,14 @@ def classify_one(id, reader):
     }
   )
 
+  if (uri):
+    uriTable.put_item(
+      Item={
+        'uri': uri,
+        'classification': classification,
+      }
+    )
+
   return classification
 
 @app.route("/classify", methods=["POST"])
@@ -279,7 +307,7 @@ def classifyRoute():
 
   result = []
   startTime = time.time()
-  result = Parallel(n_jobs=-1, prefer="threads")(delayed(classify_one)(id, reader) for id in data["ids"])
+  result = Parallel(n_jobs=-1, prefer="threads")(delayed(classify_one)(id) for id in data["ids"])
   print("returning after", time.time() - startTime)
 
   return jsonify(result)
@@ -287,9 +315,10 @@ def classifyRoute():
 @app.route("/ingest", methods=["POST"])
 def ingestRoute():
   data = request.json
+  events = data[0]["events"]["compressed"]
 
-  print(data)
+  for event in events:
+    classify_one(event["id"], event["uri"])
 
 if __name__ == "__main__":
-  reader = easyocr.Reader(['en'])
-  app.run()
+  app.run(host='0.0.0.0', port=8888)

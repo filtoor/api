@@ -97,4 +97,16 @@ resources:
           - AttributeName: url
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+    uriTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: uriTable
+        AttributeDefinitions:
+          - AttributeName: uri
+            AttributeType: S
+        KeySchema:
+          - AttributeName: uri 
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
     
