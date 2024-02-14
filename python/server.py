@@ -10,18 +10,13 @@ from PIL import Image
 import easyocr
 import io
 import time
-import multiprocessing as mp
-from ocr import get_image_words
+from joblib import Parallel, delayed
 
 load_dotenv()
 
 app = Flask(__name__)
 
 rpcUrl=os.getenv("RPC_URL")
-
-no_processes = mp.cpu_count()
-input_queues = []
-output_queues = []
 
 header_schema = CStruct(
   "versionedHeader" / U8,
@@ -70,23 +65,23 @@ def get_proof_length(treeId):
 
   return proofLength
 
-# def get_image_words(imageUrl, reader):
-#   start = time.time()
-#   print(0, "fetching image")
-#   response = requests.get(imageUrl)
+def get_image_words(imageUrl, reader):
+  start = time.time()
+  print(0, "fetching image")
+  response = requests.get(imageUrl)
 
-#   print(time.time() - start, "converting image")
-#   img = Image.open(io.BytesIO(response.content))
-#   img = img.convert("RGB")
-#   img = img.resize((1000, 1000))
-#   imgByteArr = io.BytesIO()
-#   img.save(imgByteArr, format='JPEG')
+  print(time.time() - start, "converting image")
+  img = Image.open(io.BytesIO(response.content))
+  img = img.convert("RGB")
+  img = img.resize((1000, 1000))
+  imgByteArr = io.BytesIO()
+  img.save(imgByteArr, format='JPEG')
 
-#   print(time.time() - start, "starting ocr")
-#   result = reader.readtext(imgByteArr.getvalue(), detail=0, batch_size=16)
-#   print(time.time() - start, "finished ocr")
+  print(time.time() - start, "starting ocr")
+  result = reader.readtext(imgByteArr.getvalue(), detail=0, batch_size=16)
+  print(time.time() - start, "finished ocr")
 
-#   return result
+  return result
 
 def classify_one(id, reader):
   startTime = time.time()
@@ -146,15 +141,11 @@ def classify():
 
   result = []
   startTime = time.time()
-  print(len(data["ids"]))
-  with mp.Pool(7) as p:
-    result = p.starmap(classify_one, [(id, reader) for id in data["ids"]])
-
+  result = Parallel(n_jobs=-1, prefer="threads")(delayed(classify_one)(id, reader) for id in data["ids"])
   print("returning after", time.time() - startTime)
 
   return jsonify(result)
 
 if __name__ == "__main__":
   reader = easyocr.Reader(['en'])
-  mp.set_start_method('spawn')
   app.run()
