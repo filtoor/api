@@ -102,12 +102,10 @@ def get_image_words(imageUrl):
     return response["Item"]["words"]
 
   start = time.time()
-  print(0, "fetching image")
   response = requests.get(imageUrl)
   content_type = response.headers['Content-Type']
 
   # if Image is video, process the first frame
-  print(time.time() - start, "converting image")
   if "video" in content_type:
     split = content_type.split("/")
     extension = "." + content_type.split("/")[1] if len(split) > 1 else ".mp4" # as a last attempt, try to fallback on mp4 
@@ -124,14 +122,16 @@ def get_image_words(imageUrl):
   imgByteArr = io.BytesIO()
   img.save(imgByteArr, format='JPEG')
 
-  print(time.time() - start, "starting ocr")
   result = reader.readtext(imgByteArr.getvalue(), detail=0, batch_size=16)
-  print(time.time() - start, "finished ocr")
+
+  words = []
+  for chunk in result:
+    words += chunk.split() 
 
   imageTable.put_item(
     Item={
       'url': imageUrl,
-      'words': result,
+      'words': words,
     }
   )
 
@@ -189,7 +189,6 @@ def classify_one(id, uri=None):
       return classification
 
   startTime = time.time()
-  print(0, "rpc call 1")
   
   response = requests.post(rpcUrl, headers={
       "Content-Type": "application/json",
@@ -216,7 +215,6 @@ def classify_one(id, uri=None):
 
   compressionData = rpcResponse["result"]["compression"]
   treeId = compressionData["tree"]
-  print(time.time() - startTime, "rpc call 2")
   proofLength = get_proof_length(treeId)
 
   # prefer cdn when available
@@ -228,8 +226,6 @@ def classify_one(id, uri=None):
 
   if ("image" in rpcResponse["result"]["content"]["links"]):
     imageUrl = rpcResponse["result"]["content"]["links"]["image"]
-
-    print(time.time() - startTime, "ocr call")
     imageWords = get_image_words(imageUrl)
   else:
     imageWords = []
@@ -239,8 +235,8 @@ def classify_one(id, uri=None):
   if ("attributes" in rpcResponse["result"]["content"]["metadata"]):
     attributes = rpcResponse["result"]["content"]["metadata"]["attributes"]
     for attribute in attributes:
-      attributeWords += attribute["value"].split()
-      attributeWords += attribute["trait_type"].split()
+      attributeWords += str(attribute["value"]).split()
+      attributeWords += str(attribute["trait_type"]).split()
 
   tokens = imageWords + attributeWords
 
@@ -327,7 +323,6 @@ def classifyRoute():
   result = []
   startTime = time.time()
   result = Parallel(n_jobs=-1, prefer="threads")(delayed(classify_one)(id) for id in data["ids"])
-  print("returning after", time.time() - startTime)
 
   return jsonify(result)
 
@@ -338,8 +333,9 @@ def ingestRoute():
 
   results = []
   for event in events:
-    print(event)
+    startTime = time.time()
     result = classify_one(event["assetId"], event["metadata"]["uri"])
+    print("{0}: {1} in {2}s".format(event["assetId"], result, time.time() - startTime))
     results.append(result)
   
   return "ok" 
