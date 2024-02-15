@@ -13,6 +13,7 @@ from joblib import Parallel, delayed
 import boto3
 import json
 import re
+import imageio.v3 as iio
 
 load_dotenv()
 app = Flask(__name__)
@@ -103,9 +104,21 @@ def get_image_words(imageUrl):
   start = time.time()
   print(0, "fetching image")
   response = requests.get(imageUrl)
+  content_type = response.headers['Content-Type']
 
+  # if Image is video, process the first frame
   print(time.time() - start, "converting image")
-  img = Image.open(io.BytesIO(response.content))
+  if "video" in content_type:
+    split = content_type.split("/")
+    extension = "." + content_type.split("/")[1] if len(split) > 1 else ".mp4" # as a last attempt, try to fallback on mp4 
+    frame = iio.imread(io.BytesIO(response.content), format_hint=extension, index=1)
+    output = io.BytesIO()
+    iio.imwrite(output, frame, plugin="pillow", extension=".jpeg")
+    img = Image.open(output)
+
+  else: 
+    img = Image.open(io.BytesIO(response.content))
+  
   img = img.convert("RGB")
   img = img.resize((500, 500))
   imgByteArr = io.BytesIO()
