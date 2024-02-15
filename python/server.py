@@ -14,6 +14,7 @@ import boto3
 import json
 import re
 import imageio.v3 as iio
+import logging
 
 load_dotenv()
 app = Flask(__name__)
@@ -335,10 +336,11 @@ def ingestRoute():
   for event in events:
     startTime = time.time()
     result = classify_one(event["assetId"], event["metadata"]["uri"])
-    print("{0}: {1} in {2}s".format(event["assetId"], result, time.time() - startTime))
+    print("https://xray.helius.xyz/token/{0}: {1} in {2}s".format(event["assetId"], result, time.time() - startTime))
     results.append(result)
   
   return "ok" 
 
 if __name__ == "__main__":
+  logging.getLogger("werkzeug").disabled = True
   app.run(host='0.0.0.0', port=80)
