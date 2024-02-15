@@ -226,10 +226,14 @@ def classify_one(id, uri=None):
   # else:
   #   imageUrl = rpcResponse["result"]["content"]["links"]["image"]
 
-  imageUrl = rpcResponse["result"]["content"]["links"]["image"]
+  if ("image" in rpcResponse["result"]["content"]["links"]):
+    imageUrl = rpcResponse["result"]["content"]["links"]["image"]
 
-  print(time.time() - startTime, "ocr call")
-  imageWords = get_image_words(imageUrl)
+    print(time.time() - startTime, "ocr call")
+    imageWords = get_image_words(imageUrl)
+  else:
+    imageWords = []
+
   attributeWords = []
 
   if ("attributes" in rpcResponse["result"]["content"]["metadata"]):
@@ -341,4 +345,4 @@ def ingestRoute():
   return "ok" 
 
 if __name__ == "__main__":
-  app.run(host='0.0.0.0', port=8888)
+  app.run(host='0.0.0.0', port=80)
