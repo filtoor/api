@@ -47,6 +47,9 @@ def classify(tokens):
     return "ham"
   
 def classify_one(token_id, uri=None):
+  """
+  Pull from cache or classify a single token id
+  """
   response = cnftTable.get_item(
     Key={
         'address': token_id,
@@ -95,6 +98,9 @@ def classify_one(token_id, uri=None):
 
 @app.route("/classify", methods=["POST"])
 def classify_route():
+  """
+  Classify route, takes multiple ids
+  """
   data = request.json
 
   if ("ids" not in data):
@@ -109,6 +115,9 @@ def classify_route():
 
 @app.route("/ingest", methods=["POST"])
 def ingest_route():
+  """
+  Ingest route
+  """
   data = request.json
   events = data[0]["events"]["compressed"]
 
