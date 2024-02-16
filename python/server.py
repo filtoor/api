@@ -48,6 +48,9 @@ header_schema = CStruct(
 # very useful for determining if tree is spam or not
 # lots of crazy byte counting here
 def get_proof_length(treeId):
+  if (not treeId):
+    return 0
+
   response = treeTable.get_item(
     Key={
         'address': treeId,
