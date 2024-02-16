@@ -105,16 +105,17 @@ def get_image_words(imageUrl):
   if ("Item" in response):
     return response["Item"]["words"]
 
-  start = time.time()
-  headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
-  response = requests.get(imageUrl, headers=headers, timeout=5)
-  if (response.status_code != 200):
-    return []
-    
-  content_type = response.headers['Content-Type']
 
   # if Image is video, process the first frame
   try:
+    start = time.time()
+    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
+    response = requests.get(imageUrl, headers=headers, timeout=5)
+    if (response.status_code != 200):
+      return []
+      
+    content_type = response.headers['Content-Type']
+    
     if "video" in content_type:
       split = content_type.split("/")
       extension = "." + content_type.split("/")[1] if len(split) > 1 else ".mp4" # as a last attempt, try to fallback on mp4 
