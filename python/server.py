@@ -110,36 +110,40 @@ def get_image_words(imageUrl):
   content_type = response.headers['Content-Type']
 
   # if Image is video, process the first frame
-  if "video" in content_type:
-    split = content_type.split("/")
-    extension = "." + content_type.split("/")[1] if len(split) > 1 else ".mp4" # as a last attempt, try to fallback on mp4 
-    frame = iio.imread(io.BytesIO(response.content), format_hint=extension, index=1)
-    output = io.BytesIO()
-    iio.imwrite(output, frame, plugin="pillow", extension=".jpeg")
-    img = Image.open(output)
+  try:
+    if "video" in content_type:
+      split = content_type.split("/")
+      extension = "." + content_type.split("/")[1] if len(split) > 1 else ".mp4" # as a last attempt, try to fallback on mp4 
+      frame = iio.imread(io.BytesIO(response.content), format_hint=extension, index=1)
+      output = io.BytesIO()
+      iio.imwrite(output, frame, plugin="pillow", extension=".jpeg")
+      img = Image.open(output)
 
-  else: 
-    img = Image.open(io.BytesIO(response.content))
-  
-  img = img.convert("RGB")
-  img = img.resize((500, 500))
-  imgByteArr = io.BytesIO()
-  img.save(imgByteArr, format='JPEG')
+    else: 
+      img = Image.open(io.BytesIO(response.content))
+    
+    img = img.convert("RGB")
+    img = img.resize((500, 500))
+    imgByteArr = io.BytesIO()
+    img.save(imgByteArr, format='JPEG')
 
-  result = reader.readtext(imgByteArr.getvalue(), detail=0, batch_size=16)
+    result = reader.readtext(imgByteArr.getvalue(), detail=0, batch_size=16)
 
-  words = []
-  for chunk in result:
-    words += chunk.split() 
+    words = []
+    for chunk in result:
+      words += chunk.split() 
 
-  imageTable.put_item(
-    Item={
-      'url': imageUrl,
-      'words': words,
-    }
-  )
+    imageTable.put_item(
+      Item={
+        'url': imageUrl,
+        'words': words,
+      }
+    )
 
-  return result
+    return result
+  except Exception as e:
+    print(e)
+    return []
 
 def classify(tokens):
   spamLikelihood = model["spam"]["size"] / (model["spam"]["size"] + model["ham"]["size"])
