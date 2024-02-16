@@ -8,6 +8,7 @@ import easyocr
 import io
 import boto3
 import re
+import time
 import imageio.v3 as iio
 
 load_dotenv()
@@ -73,6 +74,7 @@ def get_image_words(image_url):
         return response["Item"]["words"]
   
     try:
+        start = time.time()
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
         response = requests.get(image_url, headers=headers, timeout=5)
         if response.status_code != 200:
