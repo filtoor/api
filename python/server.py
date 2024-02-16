@@ -243,8 +243,10 @@ def classify_one(id, uri=None):
   if ("attributes" in rpcResponse["result"]["content"]["metadata"]):
     attributes = rpcResponse["result"]["content"]["metadata"]["attributes"]
     for attribute in attributes:
-      attributeWords += str(attribute["value"]).split()
-      attributeWords += str(attribute["trait_type"]).split()
+      if ("value" in attribute):
+        attributeWords += str(attribute["value"]).split()
+      if ("trait_type" in attribute):
+        attributeWords += str(attribute["trait_type"]).split()
 
   tokens = imageWords + attributeWords
 
