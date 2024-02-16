@@ -55,7 +55,7 @@ def clean_model():
         for token in list(model[category]["tokens"].keys()):
             if token in KEYWORDS:
                 continue
-            if model[category]["tokens"][token] < 2:
+            if len(token) < 2 or model[category]["tokens"][token] < 2:
                 del model[category]["tokens"][token]
 
 def main():
