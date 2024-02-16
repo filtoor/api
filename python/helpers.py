@@ -71,12 +71,16 @@ def get_image_words(image_url):
     )
     if "Item" in response:
         return response["Item"]["words"]
-
-    response = requests.get(image_url)
-    content_type = response.headers['Content-Type']
-
-    # if Image is video, process the first frame
+  
     try:
+        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
+        response = requests.get(image_url, headers=headers, timeout=5)
+        if response.status_code != 200:
+            return []
+
+        content_type = response.headers['Content-Type']
+
+        # if Image is video, process the first frame
         if "video" in content_type:
             split = content_type.split("/")
             # As a last attempt, try to fallback on mp4 
@@ -94,7 +98,9 @@ def get_image_words(image_url):
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='JPEG')
 
+        print("Image processing took", time.time() - start, "seconds")
         result = reader.readtext(img_byte_arr.getvalue(), detail=0, batch_size=16)
+        print("OCR took", time.time() - start, "seconds")
 
         words = []
         for chunk in result:
