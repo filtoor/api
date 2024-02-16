@@ -1,9 +1,7 @@
 from dotenv import load_dotenv
 import json
-import asyncio
 from helpers import extract_tokens
 import os
-import time
 
 load_dotenv()
 RPC_URL=os.getenv("RPC_URL")
@@ -35,7 +33,7 @@ def train(category, tokens):
         model[category]["tokens"][token] = model[category]["tokens"].get(token, 0) + 1
 
 
-async def download_and_train():
+def download_and_train():
     """
     Download and train the classifier on the spam and ham categories
     """
@@ -69,11 +67,13 @@ def clean_model():
             if model[category]["tokens"][token] < 2:
                 del model[category]["tokens"][token]
 
-async def main():
-    await download_and_train()
+def main():
+    download_and_train()
     clean_model()
     with open("model.json", "w") as f:
         json.dump(model, f)
     print("model saved to model.json")
 
-asyncio.run(main())
+if __name__ == "__main__":
+  main()
+
