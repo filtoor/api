@@ -112,7 +112,7 @@ def get_image_words(image_url):
         print(e)
         return []
 
-def extract_tokens(rpc_url):
+def extract_tokens(id, rpc_url):
     """
     Extract tokens (with the keywords above in mind) from an rpc_url 
     """
