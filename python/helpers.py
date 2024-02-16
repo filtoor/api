@@ -112,7 +112,7 @@ def get_image_words(image_url):
         print(e)
         return []
 
-def extract_tokens(id, rpc_url):
+def extract_tokens(token_id, rpc_url):
     """
     Extract tokens (with the keywords above in mind) from an rpc_url 
     """
@@ -124,7 +124,7 @@ def extract_tokens(id, rpc_url):
       "id": "i-love-mert",
       "method": "getAsset",
       "params": {
-        "id": id,
+        "id": token_id,
         "displayOptions": {
           "showUnverifiedCollections": True,
           "showCollectionMetadata": True,
@@ -202,8 +202,9 @@ def get_proof_length(tree_id, rpc_url):
             'address': tree_id,
         }
     )
+
     if "Item" in response:
-        return response["Item"]["proof_length"]
+        return response["Item"]["proofLength"]
 
     response = requests.post(rpc_url, headers={
         "Content-Type": "application/json",
@@ -223,8 +224,8 @@ def get_proof_length(tree_id, rpc_url):
     parsed_bytes = HEADER_SCHEMA.parse(byte_data)
 
     fixed_header_size = 80
-    max_depth = parsed_bytes["max_depth"]
-    buffer_size = parsed_bytes["maxbuffer_size"]
+    max_depth = parsed_bytes["maxDepth"]
+    buffer_size = parsed_bytes["maxBufferSize"]
 
     change_log_size = (40 + 32 * max_depth) * buffer_size
     right_most_path_size = 40 + 32 * max_depth
@@ -236,7 +237,7 @@ def get_proof_length(tree_id, rpc_url):
     treeTable.put_item(
         Item={
         'address': tree_id,
-        'proof_length': proof_length,
+        'proofLength': proof_length,
         }
     )
 

@@ -39,12 +39,12 @@ async def download_and_train():
     Download and train the classifier on the spam and ham categories
     """
     for i, id in enumerate(spam_ids):
-        tokens = await extract_tokens(id, RPC_URL)
+        tokens = extract_tokens(id, RPC_URL)
         train("spam", tokens)
         print(f"trained {id} as spam {i + 1}/{len(spam_ids)}")
 
     for i, id in enumerate(ham_ids):
-        tokens = await extract_tokens(id, RPC_URL)
+        tokens = extract_tokens(id, RPC_URL)
         train("ham", tokens)
         print(f"trained {id} as ham {i + 1}/{len(ham_ids)}")
 

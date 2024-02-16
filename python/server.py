@@ -23,33 +23,33 @@ def classify(tokens):
   """
   Return a 'spam' or 'ham' classification given a list of tokens
   """
-	spam_likelihood = model["spam"]["size"] / (model["spam"]["size"] + model["ham"]["size"])
-	ham_likelihood = 1 - spam_likelihood
+  spam_likelihood = model["spam"]["size"] / (model["spam"]["size"] + model["ham"]["size"])
+  ham_likelihood = 1 - spam_likelihood
 
-	unique_tokens = set(tokens)
+  unique_tokens = set(tokens)
 
-	for token in unique_tokens:
-		spam_numerator = 1
-		if (token in model["spam"]["tokens"]):
-			spam_numerator = model["spam"]["tokens"][token] + 1
-		ham_numerator = 1
-		if (token in model["ham"]["tokens"]):
-			ham_numerator = model["ham"]["tokens"][token] + 1
-		spam_token_likelihood = spam_numerator / (model["spam"]["size"] + 2)
-		ham_token_likelihood = ham_numerator / (model["ham"]["size"] + 2)
+  for token in unique_tokens:
+    spam_numerator = 1
+    if (token in model["spam"]["tokens"]):
+      spam_numerator = model["spam"]["tokens"][token] + 1
+    ham_numerator = 1
+    if (token in model["ham"]["tokens"]):
+      ham_numerator = model["ham"]["tokens"][token] + 1
+    spam_token_likelihood = spam_numerator / (model["spam"]["size"] + 2)
+    ham_token_likelihood = ham_numerator / (model["ham"]["size"] + 2)
 
-		spam_likelihood *= spam_token_likelihood
-		ham_likelihood *= ham_token_likelihood
+    spam_likelihood *= spam_token_likelihood
+    ham_likelihood *= ham_token_likelihood
 
-	if (spam_likelihood > ham_likelihood):
-		return "spam"
-	else:
-		return "ham"
+  if (spam_likelihood > ham_likelihood):
+    return "spam"
+  else:
+    return "ham"
   
-def classify_one(id, uri=None):
+def classify_one(token_id, uri=None):
   response = cnftTable.get_item(
     Key={
-        'address': id,
+        'address': token_id,
     }
   )
   if ("Item" in response):
@@ -67,18 +67,18 @@ def classify_one(id, uri=None):
       classification = response["Item"]["classification"]
       cnftTable.put_item(
         Item={
-          'address': id,
+          'address': token_id,
           'classification': classification,
         }
       ) 
       return classification
 
-  tokens = extract_tokens(rpcUrl)
+  tokens = extract_tokens(token_id, rpcUrl)
   classification = classify(tokens)
 
   cnftTable.put_item(
     Item={
-      'address': id,
+      'address': token_id,
       'classification': classification,
     }
   )
@@ -103,7 +103,7 @@ def classify_route():
     }), 400
 
   result = []
-  result = Parallel(n_jobs=-1, prefer="threads")(delayed(classify_one)(id) for id in data["ids"])
+  result = Parallel(n_jobs=-1, prefer="threads")(delayed(classify_one)(token_id) for token_id in data["ids"])
 
   return jsonify(result)
 
