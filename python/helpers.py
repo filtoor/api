@@ -71,7 +71,15 @@ def get_image_words(image_url):
         }
     )
     if "Item" in response:
-        return response["Item"]["words"]
+        if "words" in response["Item"].keys():
+            return response["Item"]["words"]
+        # A malformed entry has made its way into the table
+        else:
+            imageTable.delete_item(
+                Key={
+                    'url': image_url,
+                }
+            )
   
     try:
         start = time.time()
@@ -212,7 +220,15 @@ def get_proof_length(tree_id, rpc_url):
     )
 
     if "Item" in response:
-        return response["Item"]["proofLength"]
+        if "proofLength" in response["Item"].keys():
+            return response["Item"]["proofLength"]
+        # A malformed entry has made its way into the table
+        else:
+            treeTable.delete_item(
+                Key={
+                    'address': tree_id,
+                }
+            )
 
     response = requests.post(rpc_url, headers={
         "Content-Type": "application/json",
