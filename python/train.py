@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import json
-from helpers import extract_tokens
+from helpers import extract_tokens, KEYWORDS
 import os
 
 load_dotenv()
@@ -51,18 +51,9 @@ def clean_model():
     """
     Remove token lengths that can distract model results
     """
-    keywords = [
-        "containsEmoji",
-        "proofLengthImpossible",
-        "imageContainsUrl",
-        "not_containsEmoji",
-        "not_proofLengthImpossible",
-        "not_imageContainsUrl",
-    ]
-
     for category in model:
         for token in list(model[category]["tokens"].keys()):
-            if token in keywords:
+            if token in KEYWORDS:
                 continue
             if model[category]["tokens"][token] < 2:
                 del model[category]["tokens"][token]
