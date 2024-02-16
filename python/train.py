@@ -38,15 +38,15 @@ async def download_and_train():
     """
     Download and train the classifier on the spam and ham categories
     """
-    for i, id in enumerate(spam_ids):
-        tokens = extract_tokens(id, RPC_URL)
+    for i, token_id in enumerate(spam_ids):
+        tokens = extract_tokens(token_id, RPC_URL)
         train("spam", tokens)
-        print(f"trained {id} as spam {i + 1}/{len(spam_ids)}")
+        print(f"trained {token_id} as spam {i + 1}/{len(spam_ids)}")
 
-    for i, id in enumerate(ham_ids):
-        tokens = extract_tokens(id, RPC_URL)
+    for i, token_id in enumerate(ham_ids):
+        tokens = extract_tokens(token_id, RPC_URL)
         train("ham", tokens)
-        print(f"trained {id} as ham {i + 1}/{len(ham_ids)}")
+        print(f"trained {token_id} as ham {i + 1}/{len(ham_ids)}")
 
 def clean_model():
     """
