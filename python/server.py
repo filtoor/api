@@ -7,14 +7,16 @@ from joblib import Parallel, delayed
 import boto3
 import json
 import logging
+from db_helpers import CNFT
 
 load_dotenv()
 app = Flask(__name__)
 rpcUrl=os.getenv("RPC_URL")
 dynamodb = boto3.resource('dynamodb')
 
-cnftTable = dynamodb.Table('cnftTable')
-uriTable = dynamodb.Table('uriTable')
+
+nft_table = CNFT().table
+session = CNFT().db.session
 
 with open('model.json') as model_file:
   model = json.load(model_file)
@@ -46,54 +48,24 @@ def classify(tokens):
   else:
     return "ham"
   
-def classify_one(token_id, uri=None):
+def classify_one(token_id):
   """
   Pull from cache or classify a single token id
   """
-  response = cnftTable.get_item(
-    Key={
-        'address': token_id,
-    }
-  )
-  if ("Item" in response):
-    return response["Item"]["classification"]
+  query_cnft_table = session.get(nft_table, token_id)
 
-  if (uri):
-    # cache based on uri of metadata
-    # good for ingesting
-    response = uriTable.get_item(
-      Key={
-          'uri': uri,
-      }
-    )
-    if ("Item" in response):
-      classification = response["Item"]["classification"]
-      cnftTable.put_item(
-        Item={
-          'address': token_id,
-          'classification': classification,
-        }
-      ) 
-      return classification
-
-  tokens = extract_tokens(token_id, rpcUrl)
+  if query_cnft_table:
+    json_id = query_cnft_table.jsonMetadataId
+    tree_id = query_cnft_table.treeId
+    tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl, json_id, tree_id)
+  else:
+    tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl)
+    cnft_to_add = nft_table(address=token_id, jsonMetadataId=json_id, treeId=tree_id)
+    session.add(cnft_to_add)
+    session.commit()
+  
+  
   classification = classify(tokens)
-
-  cnftTable.put_item(
-    Item={
-      'address': token_id,
-      'classification': classification,
-    }
-  )
-
-  if (uri):
-    uriTable.put_item(
-      Item={
-        'uri': uri,
-        'classification': classification,
-      }
-    )
-
   return classification
 
 @app.route("/classify", methods=["POST"])
@@ -124,7 +96,7 @@ def ingest_route():
   results = []
   for event in events:
     start_time = time.time()
-    result = classify_one(event["assetId"], event["metadata"]["uri"])
+    result = classify_one(event["assetId"])
     print("https://xray.helius.xyz/token/{0}: {1} in {2}s".format(event["assetId"], result, time.time() - start_time))
     results.append(result)
 

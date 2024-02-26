@@ -1,3 +1,4 @@
+import os
 import requests
 import base64
 import math
@@ -10,13 +11,23 @@ import boto3
 import re
 import time
 import imageio.v3 as iio
+from db_helpers import imageOCRTable, jsonMetadataTable, treeTable
 
 load_dotenv()
-dynamodb = boto3.resource('dynamodb')
-imageTable = dynamodb.Table('imageTable')
-treeTable = dynamodb.Table('treeTable')
 
-reader = easyocr.Reader(['en'])
+
+image_ocr_table = imageOCRTable().table
+json_metadata_table = jsonMetadataTable().table
+tree_table = treeTable().table
+session = imageOCRTable().db.session
+
+ENDPOINT = os.getenv("ENDPOINT")
+PORT = os.getenv("PORT")
+DBNAME = os.getenv("DBNAME")
+PASSWORD = os.getenv("PASSWORD")
+DBUSER = os.getenv("DBUSER")
+
+reader = easyocr.Reader(['en'], gpu=False)
 
 KEYWORDS = [
     "contains_emoji",
@@ -65,22 +76,10 @@ def get_image_words(image_url):
     If an mp4 file is given, get the image from the first frame
     image_url: the url of the image or video to get words from
     """
-    response = imageTable.get_item(
-        Key={
-            'url': image_url,
-        }
-    )
-    if "Item" in response:
-        if "words" in response["Item"].keys():
-            return response["Item"]["words"]
-        # A malformed entry has made its way into the table
-        else:
-            imageTable.delete_item(
-                Key={
-                    'url': image_url,
-                }
-            )
-  
+    response = session.query(image_ocr_table).filter(image_ocr_table.url == image_url).first()
+    if response:
+        return response.tokens, response.id
+    
     try:
         start = time.time()
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
@@ -116,64 +115,86 @@ def get_image_words(image_url):
         for chunk in result:
             words += chunk.split()
 
-        imageTable.put_item(
-        Item={
-            'url': image_url,
-            'words': words,
-        }
-        )
-
-        return result
+        added_object_image_ocr = image_ocr_table(url=image_url, tokens=words)
+        session.add(added_object_image_ocr)
+        session.commit()
+        return result, added_object_image_ocr.id
     except Exception as e:
         print(e)
         return []
 
-def extract_tokens(token_id, rpc_url):
+def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
     """
     Extract tokens (with the keywords above in mind) from an rpc_url 
     """
-    response = requests.post(rpc_url, headers={
-      "Content-Type": "application/json",
-    },
-    json={
-      "jsonrpc": "2.0",
-      "id": "i-love-mert",
-      "method": "getAsset",
-      "params": {
-        "id": token_id,
-        "displayOptions": {
-          "showUnverifiedCollections": True,
-          "showCollectionMetadata": True,
-          "showFungible": False,
-          "showInscription": False,
-        },
-      },
-    }
-    )
-    rpc_response = response.json()
+    image_words = []
+    attributes = {}
+    query_tree_metadata = session.get(tree_table, tree_id) if tree_id else None
 
-    if "error" in rpc_response:
-        return "error"
+    if query_tree_metadata:
+        proof_length = query_tree_metadata.proofLength
+    
+    query_json_metadata = session.query(json_metadata_table, image_ocr_table).filter(json_metadata_table.id == json_id).join(image_ocr_table, image_ocr_table.id == json_metadata_table.imageOCRId).first() if json_id else None
+    if query_json_metadata: 
+        json_metadata, image_ocr_data = query_json_metadata
+        attributes = json_metadata.attributes
+        image_words = image_ocr_data.tokens
 
-    compression_data = rpc_response["result"]["compression"]
-    tree_id = compression_data["tree"]
-    proof_length = get_proof_length(tree_id, rpc_url)
-
-    if "image" in rpc_response["result"]["content"]["links"]:
-        image_url = rpc_response["result"]["content"]["links"]["image"]
-        image_words = get_image_words(image_url)
     else:
-        image_words = []
+        response = requests.post(rpc_url, headers={
+        "Content-Type": "application/json",
+        },
+        json={
+        "jsonrpc": "2.0",
+        "id": "i-love-mert",
+        "method": "getAsset",
+        "params": {
+            "id": token_id,
+            "displayOptions": {
+            "showUnverifiedCollections": True,
+            "showCollectionMetadata": True,
+            "showFungible": False,
+            "showInscription": False,
+            },
+        },
+        }
+        )
+        rpc_response = response.json()
 
+        if "error" in rpc_response:
+            return "error"
+
+        compression_data = rpc_response["result"]["compression"]
+        
+        if not query_tree_metadata:
+            tree_id = compression_data["tree"]
+            proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
+            tree_item_to_add = tree_table(address=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
+            session.add(tree_item_to_add)
+            session.commit()
+        
+        json_metadata = rpc_response["result"]["content"]["metadata"]
+        if "attributes" in json_metadata:
+            attributes = rpc_response["result"]["content"]["metadata"]["attributes"]
+        
+        if "image" in rpc_response["result"]["content"]["links"]:
+            image_url = rpc_response["result"]["content"]["links"]["image"]
+            image_words, image_ocr_id = get_image_words(image_url)
+        
+        name = json_metadata["name"]
+        description = json_metadata["description"]
+        json_to_add = json_metadata_table(name=name, description=description, attributes=attributes, imageOCRId=image_ocr_id)
+        session.add(json_to_add)
+        session.commit()
+        json_id = json_to_add.id
+    
     attribute_words = []
+    for attribute in attributes:
+        if "value" in attribute:
+            attribute_words += str(attribute["value"]).split()
+        if "trait_type" in attribute:
+            attribute_words += str(attribute["trait_type"]).split()
 
-    if "attributes" in rpc_response["result"]["content"]["metadata"]:
-        attributes = rpc_response["result"]["content"]["metadata"]["attributes"]
-        for attribute in attributes:
-            if "value" in attribute:
-                attribute_words += str(attribute["value"]).split()
-            if "trait_type" in attribute:
-                attribute_words += str(attribute["trait_type"]).split()
 
     tokens = image_words + attribute_words
 
@@ -201,35 +222,16 @@ def extract_tokens(token_id, rpc_url):
         tokens.append("contains_emoji")
     else:
         tokens.append("not_contains_emoji")
-    return tokens
+    return tokens, json_id, tree_id
 
 
 def get_proof_length(tree_id, rpc_url):
+
     """
     Gets the proof length from a given tree_id
     Very useful for determining if tree is spam or not
     Lots of crazy byte counting here
     """
-    if not tree_id:
-        return 0
-
-    response = treeTable.get_item(
-        Key={
-            'address': tree_id,
-        }
-    )
-
-    if "Item" in response:
-        if "proofLength" in response["Item"].keys():
-            return response["Item"]["proofLength"]
-        # A malformed entry has made its way into the table
-        else:
-            treeTable.delete_item(
-                Key={
-                    'address': tree_id,
-                }
-            )
-
     response = requests.post(rpc_url, headers={
         "Content-Type": "application/json",
         },
@@ -250,7 +252,6 @@ def get_proof_length(tree_id, rpc_url):
     fixed_header_size = 80
     max_depth = parsed_bytes["maxDepth"]
     buffer_size = parsed_bytes["maxBufferSize"]
-
     change_log_size = (40 + 32 * max_depth) * buffer_size
     right_most_path_size = 40 + 32 * max_depth
 
@@ -258,11 +259,4 @@ def get_proof_length(tree_id, rpc_url):
     canopy_height = int(math.log2(canopy_size / 32 + 2) - 1)
     proof_length = max_depth - canopy_height
 
-    treeTable.put_item(
-        Item={
-        'address': tree_id,
-        'proofLength': proof_length,
-        }
-    )
-
-    return proof_length
+    return proof_length, max_depth, buffer_size
