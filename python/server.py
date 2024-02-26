@@ -61,7 +61,7 @@ def classify_one(token_id):
         tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl, json_id, tree_id)
     else:
         tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl)
-        cnft_to_add = nft_table(address=token_id, jsonMetadataId=json_id, treeId=tree_id)
+        cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
         session.add(cnft_to_add)
         session.commit()
 

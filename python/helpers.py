@@ -7,7 +7,6 @@ from borsh_construct import CStruct, U8, U32, U64
 from PIL import Image
 import easyocr
 import io
-import boto3
 import re
 import time
 import imageio.v3 as iio
@@ -135,7 +134,7 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
         proof_length = query_tree_metadata.proofLength
     
     query_json_metadata = session.query(json_metadata_table, image_ocr_table).filter(json_metadata_table.id == json_id).join(image_ocr_table, image_ocr_table.id == json_metadata_table.imageOCRId).first() if json_id else None
-    if query_json_metadata: 
+    if query_json_metadata:
         json_metadata, image_ocr_data = query_json_metadata
         attributes = json_metadata.attributes
         image_words = image_ocr_data.tokens
@@ -157,7 +156,7 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
             "showInscription": False,
             },
         },
-        }
+        }, timeout = 10
         )
         rpc_response = response.json()
 
@@ -165,22 +164,28 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
             return "error"
 
         compression_data = rpc_response["result"]["compression"]
-        
+   
         if not query_tree_metadata:
             tree_id = compression_data["tree"]
-            proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
-            tree_item_to_add = tree_table(address=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
-            session.add(tree_item_to_add)
-            session.commit()
-        
+            tree_metadata = session.query(tree_table).filter(tree_table.id == tree_id).first()
+
+            if tree_metadata:
+                proof_length = tree_metadata.proofLength
+
+            else:
+                proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
+                tree_item_to_add = tree_table(id=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
+                session.add(tree_item_to_add)
+                session.commit()
+
         json_metadata = rpc_response["result"]["content"]["metadata"]
         if "attributes" in json_metadata:
             attributes = rpc_response["result"]["content"]["metadata"]["attributes"]
-        
+
         if "image" in rpc_response["result"]["content"]["links"]:
             image_url = rpc_response["result"]["content"]["links"]["image"]
             image_words, image_ocr_id = get_image_words(image_url)
-        
+
         name = json_metadata["name"]
         description = json_metadata["description"]
         json_to_add = json_metadata_table(name=name, description=description, attributes=attributes, imageOCRId=image_ocr_id)
