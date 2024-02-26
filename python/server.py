@@ -4,7 +4,6 @@ import os
 from dotenv import load_dotenv
 import time
 from joblib import Parallel, delayed
-import boto3
 import json
 import logging
 from db_helpers import CNFT
@@ -12,8 +11,6 @@ from db_helpers import CNFT
 load_dotenv()
 app = Flask(__name__)
 rpcUrl=os.getenv("RPC_URL")
-dynamodb = boto3.resource('dynamodb')
-
 
 nft_table = CNFT().table
 session = CNFT().db.session
@@ -103,5 +100,4 @@ def ingest_route():
   return "ok"
 
 if __name__ == "__main__":
-  logging.getLogger("werkzeug").disabled = True
   app.run()
