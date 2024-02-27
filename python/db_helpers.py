@@ -27,7 +27,7 @@ class SingletonDataBase:
         return cls._instance
 
     def __init__(self):
-            self.engine = sa.create_engine(f"postgresql+psycopg2://{DBUSER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DBNAME}")
+            self.engine = sa.create_engine(f"postgresql+psycopg2://{DBUSER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DBNAME}", connect_args={'connect_timeout': 10})
             self.base = automap_base()
             self.base.prepare(self.engine, reflect=True)
             self.session = Session(self.engine)
