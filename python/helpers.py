@@ -218,18 +218,18 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
             contains_emoji = True
 
     if proof_length > 23:
-        tokens.append("proof_lengthImpossible")
+        tokens.append("proofLengthImpossible")
     else:
-        tokens.append("not_proof_lengthImpossible")
+        tokens.append("not_ProofLengthImpossible")
 
     if contains_url:
-        tokens.append("imagecontains_url")
+        tokens.append("imageContainsUrl")
     else:
-        tokens.append("not_imagecontains_url")
+        tokens.append("not_imageContainsUrl")
     if contains_emoji:
-        tokens.append("contains_emoji")
+        tokens.append("containsEmoji")
     else:
-        tokens.append("not_contains_emoji")
+        tokens.append("not_containsEmoji")
     return tokens, json_id, tree_id
 
 
@@ -272,4 +272,3 @@ def get_proof_length(tree_id, rpc_url):
     proof_length = max_depth - canopy_height
 
     return proof_length, max_depth, buffer_size
-
