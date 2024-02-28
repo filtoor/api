@@ -84,7 +84,7 @@ def get_image_words(image_url):
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
         response = requests.get(image_url, headers=headers, timeout=5)
         if response.status_code != 200:
-            return [], -1
+            return [], None
 
         content_type = response.headers['Content-Type']
 
@@ -162,12 +162,13 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
         rpc_response = response.json()
 
         if "error" in rpc_response:
-            return "error", -1, -1
+            return "error", None, None
 
    
         if not query_tree_metadata:
             if "compression" not in rpc_response["result"]:
                 proof_length = 0
+                tree_id = None
             
             else:
                 tree_id = rpc_response["result"]["compression"]["tree"]
@@ -271,3 +272,4 @@ def get_proof_length(tree_id, rpc_url):
     proof_length = max_depth - canopy_height
 
     return proof_length, max_depth, buffer_size
+
