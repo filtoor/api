@@ -127,7 +127,7 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
     Extract tokens (with the keywords above in mind) from an rpc_url 
     """
     image_words = []
-    attributes = {}
+    attribute_words = []
     query_tree_metadata = session.get(tree_table, tree_id) if tree_id else None
 
     if query_tree_metadata:
@@ -136,7 +136,7 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
     query_json_metadata = session.query(json_metadata_table, image_ocr_table).filter(json_metadata_table.id == json_id).join(image_ocr_table, image_ocr_table.id == json_metadata_table.imageOCRId).first() if json_id else None
     if query_json_metadata:
         json_metadata, image_ocr_data = query_json_metadata
-        attributes = json_metadata.attributes
+        attribute_words = json_metadata.attributes
         image_words = image_ocr_data.tokens
 
     else:
@@ -163,46 +163,47 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
         if "error" in rpc_response:
             return "error"
 
-        compression_data = rpc_response["result"]["compression"]
    
         if not query_tree_metadata:
-            tree_id = compression_data["tree"]
-            tree_metadata = session.query(tree_table).filter(tree_table.id == tree_id).first()
-
-            if tree_metadata:
-                proof_length = tree_metadata.proofLength
-
+            if "compression" not in rpc_response["result"]:
+                proof_length = 0
+            
             else:
-                proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
-                tree_item_to_add = tree_table(id=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
-                session.add(tree_item_to_add)
-                session.commit()
+                tree_id = rpc_response["result"]["compression"]["tree"]
+                tree_metadata = session.query(tree_table).filter(tree_table.id == tree_id).first()
+
+                if tree_metadata:
+                    proof_length = tree_metadata.proofLength
+
+                else:
+                    proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
+                    tree_item_to_add = tree_table(id=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
+                    session.add(tree_item_to_add)
+                    session.commit()
 
         json_metadata = rpc_response["result"]["content"]["metadata"]
         if "attributes" in json_metadata:
             attributes = rpc_response["result"]["content"]["metadata"]["attributes"]
+            for attribute in attributes:
+                if "value" in attribute:
+                    attribute_words += str(attribute["value"]).split()
+                if "trait_type" in attribute:
+                    attribute_words += str(attribute["trait_type"]).split()
 
         if "image" in rpc_response["result"]["content"]["links"]:
             image_url = rpc_response["result"]["content"]["links"]["image"]
             image_words, image_ocr_id = get_image_words(image_url)
+        else:
+            image_words, image_ocr_id = [], None
 
-        name = json_metadata["name"]
-        description = json_metadata["description"]
-        json_to_add = json_metadata_table(name=name, description=description, attributes=attributes, imageOCRId=image_ocr_id)
+        name = json_metadata["name"] if "name" in json_metadata else ""
+        description = json_metadata["description"] if "description" in json_metadata else ""
+        json_to_add = json_metadata_table(name=name, description=description, attributes=attribute_words, imageOCRId=image_ocr_id)
         session.add(json_to_add)
         session.commit()
         json_id = json_to_add.id
-    
-    attribute_words = []
-    for attribute in attributes:
-        if "value" in attribute:
-            attribute_words += str(attribute["value"]).split()
-        if "trait_type" in attribute:
-            attribute_words += str(attribute["trait_type"]).split()
-
 
     tokens = image_words + attribute_words
-
     tokens = list(filter(lambda token: len(token) > 2 and token not in KEYWORDS, tokens))
 
     contains_url = False
