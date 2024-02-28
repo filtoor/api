@@ -84,7 +84,7 @@ def get_image_words(image_url):
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
         response = requests.get(image_url, headers=headers, timeout=5)
         if response.status_code != 200:
-            return []
+            return [], None
 
         content_type = response.headers['Content-Type']
 
@@ -120,7 +120,7 @@ def get_image_words(image_url):
         return result, added_object_image_ocr.id
     except Exception as e:
         print(e)
-        return []
+        return [], -1
 
 def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
     """
@@ -128,6 +128,7 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
     """
     image_words = []
     attribute_words = []
+    proof_length = 0
     query_tree_metadata = session.get(tree_table, tree_id) if tree_id else None
 
     if query_tree_metadata:
@@ -161,12 +162,13 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
         rpc_response = response.json()
 
         if "error" in rpc_response:
-            return "error"
+            return "error", None, None
 
    
         if not query_tree_metadata:
             if "compression" not in rpc_response["result"]:
                 proof_length = 0
+                tree_id = None
             
             else:
                 tree_id = rpc_response["result"]["compression"]["tree"]
@@ -216,18 +218,18 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
             contains_emoji = True
 
     if proof_length > 23:
-        tokens.append("proof_lengthImpossible")
+        tokens.append("proofLengthImpossible")
     else:
-        tokens.append("not_proof_lengthImpossible")
+        tokens.append("not_ProofLengthImpossible")
 
     if contains_url:
-        tokens.append("imagecontains_url")
+        tokens.append("imageContainsUrl")
     else:
-        tokens.append("not_imagecontains_url")
+        tokens.append("not_imageContainsUrl")
     if contains_emoji:
-        tokens.append("contains_emoji")
+        tokens.append("containsEmoji")
     else:
-        tokens.append("not_contains_emoji")
+        tokens.append("not_containsEmoji")
     return tokens, json_id, tree_id
 
 
@@ -251,6 +253,10 @@ def get_proof_length(tree_id, rpc_url):
         },
     )
     rpc_response = response.json()
+
+    if "error" in rpc_response:
+        return 0, 0, 0
+
     data = rpc_response["result"]["value"]["data"][0]
     byte_data = base64.b64decode(data.encode())
     parsed_bytes = HEADER_SCHEMA.parse(byte_data)

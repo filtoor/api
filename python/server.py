@@ -17,7 +17,7 @@ rpcUrl=os.getenv("RPC_URL")
 nft_table = CNFT().table
 session = CNFT().db.session
 
-with open('model.json', "r", -1, "utf-8") as model_file:
+with open('model.json') as model_file:
     model = json.load(model_file)
 
 def classify(tokens):
@@ -61,10 +61,11 @@ def classify_one(token_id):
         tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl, json_id, tree_id)
     else:
         tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl)
-        cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
-        session.add(cnft_to_add)
-        session.commit()
-
+        if json_id:
+            cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
+            session.add(cnft_to_add)
+            session.commit()
+    
     classification = classify(tokens)
     return classification
 
@@ -104,3 +105,4 @@ def ingest_route():
 
 if __name__ == "__main__":
     app.run()
+
