@@ -32,12 +32,10 @@ def classify(tokens):
     for token in unique_tokens:
         spam_numerator = 1
         if token in model["spam"]["tokens"]:
-            print("in spam if")
             spam_numerator = model["spam"]["tokens"][token] + 1
 
         ham_numerator = 1
         if token in model["ham"]["tokens"]:
-            print("in ham if")
             ham_numerator = model["ham"]["tokens"][token] + 1
 
         spam_token_likelihood = spam_numerator / (model["spam"]["size"] + 2)
@@ -93,7 +91,6 @@ def ingest_route():
     """
     Ingest route
     """
-    print("ingesting")
     data = request.json
     events = data[0]["events"]["compressed"]
 
