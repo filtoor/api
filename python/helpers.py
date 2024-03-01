@@ -10,11 +10,11 @@ import io
 import re
 import time
 import imageio.v3 as iio
-from db_helpers import imageOCRTable, jsonMetadataTable, treeTable
+from db_helpers import CNFT, imageOCRTable, jsonMetadataTable, treeTable
 
 load_dotenv()
 
-
+nft_table = CNFT().table
 image_ocr_table = imageOCRTable().table
 json_metadata_table = jsonMetadataTable().table
 tree_table = treeTable().table
@@ -122,68 +122,66 @@ def get_image_words(image_url):
         print(e)
         return [], -1
 
-def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
+def fetch_and_store_tokens(token_id, rpc_url):
     """
-    Extract tokens (with the keywords above in mind) from an rpc_url 
+    Fetch tokens for a token_id given the rpc_url
+    Populate our database with appropriate artifacts as well
     """
     print("extracting", token_id)
     image_words = []
     attribute_words = []
     proof_length = 0
-    query_tree_metadata = session.get(tree_table, tree_id) if tree_id else None
+    json_id = None
+    tree_id = None
 
-    if query_tree_metadata:
-        proof_length = query_tree_metadata.proofLength
+    response = requests.post(rpc_url, headers={
+    "Content-Type": "application/json",
+    },
+    json={
+    "jsonrpc": "2.0",
+    "id": "i-love-mert",
+    "method": "getAsset",
+    "params": {
+        "id": token_id,
+        "displayOptions": {
+        "showUnverifiedCollections": True,
+        "showCollectionMetadata": True,
+        "showFungible": False,
+        "showInscription": False,
+        },
+    },
+    }, timeout = 10
+    )
+    rpc_response = response.json()
+
+    if "error" in rpc_response:
+        return "error", None, None
+
+
+    if "compression" not in rpc_response["result"]:
+        proof_length = 0
+        tree_id = None
     
-    query_json_metadata = session.query(json_metadata_table, image_ocr_table).filter(json_metadata_table.id == json_id).join(image_ocr_table, image_ocr_table.id == json_metadata_table.imageOCRId).first() if json_id else None
+    else:
+        tree_id = rpc_response["result"]["compression"]["tree"]
+        tree_metadata = session.query(tree_table).filter(tree_table.id == tree_id).first()
+
+        if tree_metadata:
+            proof_length = tree_metadata.proofLength
+
+        else:
+            proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
+            tree_item_to_add = tree_table(id=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
+            session.add(tree_item_to_add)
+            session.commit()
+    
+    json_uri = rpc_response["result"]["content"]["json_uri"]
+    query_json_metadata = session.query(json_metadata_table, image_ocr_table).filter(json_metadata_table.id == json_uri).join(image_ocr_table, image_ocr_table.id == json_metadata_table.imageOCRId).first()
     if query_json_metadata:
         json_metadata, image_ocr_data = query_json_metadata
         attribute_words = json_metadata.attributes
         image_words = image_ocr_data.tokens
-
     else:
-        response = requests.post(rpc_url, headers={
-        "Content-Type": "application/json",
-        },
-        json={
-        "jsonrpc": "2.0",
-        "id": "i-love-mert",
-        "method": "getAsset",
-        "params": {
-            "id": token_id,
-            "displayOptions": {
-            "showUnverifiedCollections": True,
-            "showCollectionMetadata": True,
-            "showFungible": False,
-            "showInscription": False,
-            },
-        },
-        }, timeout = 10
-        )
-        rpc_response = response.json()
-
-        if "error" in rpc_response:
-            return "error", None, None
-
-   
-        if not query_tree_metadata:
-            if "compression" not in rpc_response["result"]:
-                proof_length = 0
-                tree_id = None
-            
-            else:
-                tree_id = rpc_response["result"]["compression"]["tree"]
-                tree_metadata = session.query(tree_table).filter(tree_table.id == tree_id).first()
-
-                if tree_metadata:
-                    proof_length = tree_metadata.proofLength
-
-                else:
-                    proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
-                    tree_item_to_add = tree_table(id=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
-                    session.add(tree_item_to_add)
-                    session.commit()
-
         json_metadata = rpc_response["result"]["content"]["metadata"]
         if "attributes" in json_metadata:
             attributes = rpc_response["result"]["content"]["metadata"]["attributes"]
@@ -201,11 +199,27 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
 
         name = json_metadata["name"] if "name" in json_metadata else ""
         description = json_metadata["description"] if "description" in json_metadata else ""
-        json_to_add = json_metadata_table(name=name, description=description, attributes=attribute_words, imageOCRId=image_ocr_id)
+        json_to_add = json_metadata_table(id=json_uri, name=name, description=description, attributes=attribute_words, imageOCRId=image_ocr_id)
         session.add(json_to_add)
         session.commit()
         json_id = json_to_add.id
+    
 
+    tokens = get_tokens(image_words, attribute_words, proof_length)
+
+
+    if json_id:
+        cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
+        session.add(cnft_to_add)
+        session.commit()
+    return tokens
+
+
+
+def get_tokens(image_words, attribute_words, proof_length):
+    """
+    Construct the token list given image_words, attribute_words and proof_length
+    """
     tokens = image_words + attribute_words
     tokens = list(filter(lambda token: len(token) > 2 and token not in KEYWORDS, tokens))
 
@@ -231,7 +245,7 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
         tokens.append("containsEmoji")
     else:
         tokens.append("not_containsEmoji")
-    return tokens, json_id, tree_id
+    return tokens
 
 
 def get_proof_length(tree_id, rpc_url):
@@ -273,3 +287,5 @@ def get_proof_length(tree_id, rpc_url):
     proof_length = max_depth - canopy_height
 
     return proof_length, max_depth, buffer_size
+
+

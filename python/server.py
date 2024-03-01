@@ -7,14 +7,17 @@ import time
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from joblib import Parallel, delayed
-from helpers import extract_tokens
-from db_helpers import CNFT
+from helpers import fetch_and_store_tokens, get_tokens
+from db_helpers import CNFT, imageOCRTable, jsonMetadataTable, treeTable
 
 load_dotenv()
 app = Flask(__name__)
 rpcUrl=os.getenv("RPC_URL")
 
 nft_table = CNFT().table
+image_ocr_table = imageOCRTable().table
+json_metadata_table = jsonMetadataTable().table
+tree_table = treeTable().table
 session = CNFT().db.session
 
 with open('model.json') as model_file:
@@ -53,19 +56,14 @@ def classify_one(token_id):
     """
     Pull from cache or classify a single token id
     """
-    query_cnft_table = session.get(nft_table, token_id)
+    query_cnft_table = session.query(nft_table, json_metadata_table, tree_table, image_ocr_table).filter(nft_table.id == token_id).join(json_metadata_table, json_metadata_table.id == nft_table.jsonMetadataId).join(image_ocr_table, image_ocr_table.id == json_metadata_table.imageOCRId).join(tree_table, tree_table.id == nft_table.treeId).first()
 
     if query_cnft_table:
-        json_id = query_cnft_table.jsonMetadataId
-        tree_id = query_cnft_table.treeId
-        tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl, json_id, tree_id)
+        _, json_metadata, tree_metadata, image_metadata = query_cnft_table
+        tokens = get_tokens(image_metadata.tokens, json_metadata.attributes, tree_metadata.proofLength if tree_metadata else 0) # Tree metadata can be None
     else:
-        tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl)
-        if json_id:
-            cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
-            session.add(cnft_to_add)
-            session.commit()
-    
+        tokens = fetch_and_store_tokens(token_id, rpcUrl)
+
     classification = classify(tokens)
     return classification
 
@@ -105,4 +103,6 @@ def ingest_route():
 
 if __name__ == "__main__":
     app.run()
+
+
 

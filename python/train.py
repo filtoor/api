@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import json
-from helpers import extract_tokens, KEYWORDS
+from helpers import fetch_and_store_tokens, KEYWORDS
 import os
 
 load_dotenv()
@@ -38,12 +38,12 @@ def download_and_train():
     Download and train the classifier on the spam and ham categories
     """
     for i, token_id in enumerate(spam_ids):
-        tokens = extract_tokens(token_id, RPC_URL)
+        tokens = fetch_and_store_tokens(token_id, RPC_URL)
         train("spam", tokens)
         print(f"trained {token_id} as spam {i + 1}/{len(spam_ids)}")
 
     for i, token_id in enumerate(ham_ids):
-        tokens = extract_tokens(token_id, RPC_URL)
+        tokens = fetch_and_store_tokens(token_id, RPC_URL)
         train("ham", tokens)
         print(f"trained {token_id} as ham {i + 1}/{len(ham_ids)}")
 
@@ -67,4 +67,5 @@ def main():
 
 if __name__ == "__main__":
   main()
+
 
