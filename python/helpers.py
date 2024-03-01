@@ -122,14 +122,17 @@ def get_image_words(image_url):
         print(e)
         return [], -1
 
-def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
+def fetch_and_store_tokens(token_id, rpc_url):
     """
-    Extract tokens (with the keywords above in mind) from an rpc_url 
+    Fetch tokens for a token_id given the rpc_url
+    Populate our database with appropriate artifacts as well
     """
     print("extracting", token_id)
     image_words = []
     attribute_words = []
     proof_length = 0
+    json_id = None
+    tree_id = None
 
     response = requests.post(rpc_url, headers={
     "Content-Type": "application/json",
@@ -284,4 +287,5 @@ def get_proof_length(tree_id, rpc_url):
     proof_length = max_depth - canopy_height
 
     return proof_length, max_depth, buffer_size
+
 

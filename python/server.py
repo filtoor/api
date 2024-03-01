@@ -7,7 +7,7 @@ import time
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from joblib import Parallel, delayed
-from helpers import extract_tokens, get_tokens
+from helpers import fetch_and_store_tokens, get_tokens
 from db_helpers import CNFT, imageOCRTable, jsonMetadataTable, treeTable
 
 load_dotenv()
@@ -62,7 +62,7 @@ def classify_one(token_id):
         _, json_metadata, tree_metadata, image_metadata = query_cnft_table
         tokens = get_tokens(image_metadata.tokens, json_metadata.attributes, tree_metadata.proofLength if tree_metadata else 0) # Tree metadata can be None
     else:
-        tokens = extract_tokens(token_id, rpcUrl)
+        tokens = fetch_and_store_tokens(token_id, rpcUrl)
 
     classification = classify(tokens)
     return classification
@@ -103,5 +103,6 @@ def ingest_route():
 
 if __name__ == "__main__":
     app.run()
+
 
 
