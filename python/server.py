@@ -62,12 +62,8 @@ def classify_one(token_id):
         _, json_metadata, tree_metadata, image_metadata = query_cnft_table
         tokens = get_tokens(image_metadata.tokens, json_metadata.attributes, tree_metadata.proofLength if tree_metadata else 0) # Tree metadata can be None
     else:
-        tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl)
-        if json_id:
-            cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
-            session.add(cnft_to_add)
-            session.commit()
-    
+        tokens = extract_tokens(token_id, rpcUrl)
+
     classification = classify(tokens)
     return classification
 

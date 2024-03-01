@@ -10,11 +10,11 @@ import io
 import re
 import time
 import imageio.v3 as iio
-from db_helpers import imageOCRTable, jsonMetadataTable, treeTable
+from db_helpers import CNFT, imageOCRTable, jsonMetadataTable, treeTable
 
 load_dotenv()
 
-
+nft_table = CNFT().table
 image_ocr_table = imageOCRTable().table
 json_metadata_table = jsonMetadataTable().table
 tree_table = treeTable().table
@@ -203,7 +203,13 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
     
 
     tokens = get_tokens(image_words, attribute_words, proof_length)
-    return tokens, json_id, tree_id
+
+
+    if json_id:
+        cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
+        session.add(cnft_to_add)
+        session.commit()
+    return tokens
 
 
 
