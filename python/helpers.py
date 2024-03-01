@@ -82,7 +82,7 @@ def get_image_words(image_url):
     try:
         start = time.time()
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
-        response = requests.get(image_url, headers=headers, timeout=5)
+        response = requests.get(image_url, headers=headers, verify=False, timeout=5)
         if response.status_code != 200:
             return []
 
@@ -126,6 +126,7 @@ def extract_tokens(token_id, rpc_url, json_id=None, tree_id=None):
     """
     Extract tokens (with the keywords above in mind) from an rpc_url 
     """
+    print("extracting", token_id)
     image_words = []
     attributes = {}
     query_tree_metadata = session.get(tree_table, tree_id) if tree_id else None
