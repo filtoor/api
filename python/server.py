@@ -60,7 +60,7 @@ def classify_one(token_id):
 
     if query_cnft_table:
         _, json_metadata, tree_metadata, image_metadata = query_cnft_table
-        tokens = get_tokens(image_metadata.tokens, json_metadata.attributes, tree_metadata.proofLength)
+        tokens = get_tokens(image_metadata.tokens, json_metadata.attributes, tree_metadata.proofLength if tree_metadata else 0) # Tree metadata can be None
     else:
         tokens, json_id, tree_id = extract_tokens(token_id, rpcUrl)
         if json_id:
