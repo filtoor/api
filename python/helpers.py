@@ -116,7 +116,10 @@ def get_image_words(image_url):
 
         added_object_image_ocr = image_ocr_table(url=image_url, tokens=words)
         session.add(added_object_image_ocr)
-        session.commit()
+        try:
+            session.commit()
+        except Exception as e: 
+            session.rollback()
         return result, added_object_image_ocr.id
     except Exception as e:
         print(e)
@@ -173,7 +176,10 @@ def fetch_and_store_tokens(token_id, rpc_url):
             proof_length, max_depth, buffer_size = get_proof_length(tree_id, rpc_url)
             tree_item_to_add = tree_table(id=tree_id, proofLength=proof_length, maxDepth=max_depth, maxBuffer=buffer_size)
             session.add(tree_item_to_add)
-            session.commit()
+            try:
+                session.commit()
+            except Exception as e: 
+                session.rollback()
     
     json_uri = rpc_response["result"]["content"]["json_uri"]
     query_json_metadata = session.query(json_metadata_table, image_ocr_table).filter(json_metadata_table.id == json_uri).join(image_ocr_table, image_ocr_table.id == json_metadata_table.imageOCRId).first()
@@ -201,7 +207,10 @@ def fetch_and_store_tokens(token_id, rpc_url):
         description = json_metadata["description"] if "description" in json_metadata else ""
         json_to_add = json_metadata_table(id=json_uri, name=name, description=description, attributes=attribute_words, imageOCRId=image_ocr_id)
         session.add(json_to_add)
-        session.commit()
+        try:
+            session.commit()
+        except Exception as e: 
+            session.rollback()
         json_id = json_to_add.id
     
 
@@ -211,7 +220,10 @@ def fetch_and_store_tokens(token_id, rpc_url):
     if json_id:
         cnft_to_add = nft_table(id=token_id, jsonMetadataId=json_id, treeId=tree_id)
         session.add(cnft_to_add)
-        session.commit()
+        try:
+            session.commit()
+        except Exception as e: 
+            session.rollback()
     return tokens
 
 
